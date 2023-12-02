@@ -5,7 +5,7 @@ This is application for single node multi-gpus
 import os
 import time
 import torch
-import visdom
+# import visdom
 import argparse
 import torch.distributed as dist
 import torch.multiprocessing as mp
@@ -20,6 +20,11 @@ from torch.utils.data.distributed import DistributedSampler
 # for model
 from torchvision.models import vgg11
 from torch.nn.parallel import DistributedDataParallel as DDP
+
+# for profile
+from deepspeed.profiling.flops_profiler import FlopsProfiler
+# from torch.profiler import profile, record_function, ProfilerActivity
+
 
 def get_args_parser():
     parser = argparse.ArgumentParser(add_help=False)
@@ -50,7 +55,7 @@ def main_worker(rank, opts):
     local_gpu_id = init_for_distributed(rank, opts)
     print("start")
     # 3. visdom
-    vis = visdom.Visdom(server='goguma2.kaist.ac.kr', port=opts.port)
+    # vis = visdom.Visdom(server='goguma2.kaist.ac.kr', port=opts.port)
 
     # 4. data set
     transform_train = tfs.Compose([
@@ -98,8 +103,9 @@ def main_worker(rank, opts):
                              pin_memory=True)
 
     # 5. model
-    model = vgg11(pretrained=False)
+    model = vgg11(weights=None)
     model = model.cuda(local_gpu_id)
+    prof = FlopsProfiler(model)
     model = DDP(module=model,
                 device_ids=[local_gpu_id])
 
@@ -128,7 +134,11 @@ def main_worker(rank, opts):
         if opts.rank == 0:
             print('\nLoaded checkpoint from epoch %d.\n' % (int(opts.start_epoch) - 1))
 
-    print("start training")
+    
+    profile_step = 5
+    print_profile = True
+
+    start_time = time.time() 
     for epoch in range(opts.start_epoch, opts.epoch):
 
         # 9. train
@@ -137,15 +147,42 @@ def main_worker(rank, opts):
         train_sampler.set_epoch(epoch)
 
         for i, (images, labels) in enumerate(train_loader):
+
+            # strart profiling at training step "profile_step"
+            if i % profile_step == 0:
+                prof.start_profile()
+
+
             images = images.to(local_gpu_id)
             labels = labels.to(local_gpu_id)
+
+            # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], profile_memory= True, with_flops= True) as prof:    
             outputs = model(images)
 
+            # end profiling and print ouput
+            if i % profile_step == 0:  
+                prof.stop_profile()
+                flops = prof.get_total_flops()
+                macs = prof.get_total_macs()
+                params = prof.get_total_params()
+                if print_profile:
+                    file_path = os.path.join("./profile",f"gpu{str(local_gpu_id)}",f"iter{i}_epoch{epoch}.txt")
+                    prof.print_model_profile(profile_step=profile_step, output_file=file_path)
+
+                    with open(file_path, 'a') as f:
+                        current_time = time.time()
+                        f.write(str(current_time - start_time))
+
+                prof.end_profile()
+
+                
             # ----------- update -----------
             optimizer.zero_grad()
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
+
+            # print(prof.key_averages())
 
             # get lr
             for param_group in optimizer.param_groups:
@@ -163,14 +200,14 @@ def main_worker(rank, opts):
                                                                                                           lr,
                                                                                                           toc - tic))
 
-                vis.line(X=torch.ones((1, 1)) * i + epoch * len(train_loader),
-                         Y=torch.Tensor([loss]).unsqueeze(0),
-                         update='append',
-                         win='loss',
-                         opts=dict(x_label='step',
-                                   y_label='loss',
-                                   title='loss',
-                                   legend=['total_loss']))
+                # vis.line(X=torch.ones((1, 1)) * i + epoch * len(train_loader),
+                #          Y=torch.Tensor([loss]).unsqueeze(0),
+                #          update='append',
+                #          win='loss',
+                #          opts=dict(x_label='step',
+                #                    y_label='loss',
+                #                    title='loss',
+                #                    legend=['total_loss']))
 
         # save pth file
         if opts.rank == 0:
@@ -222,20 +259,22 @@ def main_worker(rank, opts):
             accuracy_top5 = correct_top5 / total
 
             val_avg_loss = val_avg_loss / len(test_loader)  # make mean loss
-            if vis is not None:
-                vis.line(X=torch.ones((1, 3)) * epoch,
-                         Y=torch.Tensor([accuracy_top1, accuracy_top5, val_avg_loss]).unsqueeze(0),
-                         update='append',
-                         win='test_loss_acc',
-                         opts=dict(x_label='epoch',
-                                   y_label='test_loss and acc',
-                                   title='test_loss and accuracy',
-                                   legend=['accuracy_top1', 'accuracy_top5', 'avg_loss']))
+            # if vis is not None:
+            #     vis.line(X=torch.ones((1, 3)) * epoch,
+            #              Y=torch.Tensor([accuracy_top1, accuracy_top5, val_avg_loss]).unsqueeze(0),
+            #              update='append',
+            #              win='test_loss_acc',
+            #              opts=dict(x_label='epoch',
+            #                        y_label='test_loss and acc',
+            #                        title='test_loss and accuracy',
+            #                        legend=['accuracy_top1', 'accuracy_top5', 'avg_loss']))
 
             print("top-1 percentage :  {0:0.3f}%".format(correct_top1 / total * 100))
             print("top-5 percentage :  {0:0.3f}%".format(correct_top5 / total * 100))
             scheduler.step()
 
+    cleanup()
+    
     return 0
 
 
@@ -252,15 +291,15 @@ def init_for_distributed(rank, opts):
         print("Use GPU: {} for training".format(local_gpu_id))
 
     # 2. init_process_group
-    dist.init_process_group(backend='nccl',
-                            # init_method='tcp://0.0.0.0:23456',
+    dist.init_process_group(backend='gloo',
+                            # init_method='tcp://goguma2.kaist.ac.kr:23456',
                             world_size=opts.world_size,
                             rank=opts.rank)
     print("end init process group")
     # if put this function, the all processes block at all.
     torch.distributed.barrier()
     # convert print fn iif rank is zero
-    setup_for_distributed(opts.rank == 0)
+    # setup_for_distributed(opts.rank == 0)
     print(opts)
     return local_gpu_id
 
@@ -278,6 +317,9 @@ def setup_for_distributed(is_master):
             builtin_print(*args, **kwargs)
 
     __builtin__.print = print
+
+def cleanup():
+    dist.destroy_process_group()
 
 
 if __name__ == '__main__':
