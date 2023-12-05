@@ -22,9 +22,8 @@ from torchvision.models import vgg11
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 # for profile
-from deepspeed.profiling.flops_profiler import FlopsProfiler
 # from torch.profiler import profile, record_function, ProfilerActivity
-
+from deepspeed.profiling.flops_profiler import FlopsProfiler
 
 def get_args_parser():
     parser = argparse.ArgumentParser(add_help=False)
@@ -53,9 +52,6 @@ def main_worker(rank, opts):
 	# 1. argparse (main)
     # 2. init dist
     local_gpu_id = init_for_distributed(rank, opts)
-    print("start")
-    # 3. visdom
-    # vis = visdom.Visdom(server='goguma2.kaist.ac.kr', port=opts.port)
 
     # 4. data set
     transform_train = tfs.Compose([
@@ -105,6 +101,7 @@ def main_worker(rank, opts):
     # 5. model
     model = vgg11(weights=None)
     model = model.cuda(local_gpu_id)
+    # For Profiling
     prof = FlopsProfiler(model)
     model = DDP(module=model,
                 device_ids=[local_gpu_id])
@@ -148,17 +145,16 @@ def main_worker(rank, opts):
 
         for i, (images, labels) in enumerate(train_loader):
 
-            # strart profiling at training step "profile_step"
+            # start profiling at training step "profile_step"
             if i % profile_step == 0:
                 prof.start_profile()
-
 
             images = images.to(local_gpu_id)
             labels = labels.to(local_gpu_id)
 
             # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], profile_memory= True, with_flops= True) as prof:    
             outputs = model(images)
-
+                
             # end profiling and print ouput
             if i % profile_step == 0:  
                 prof.stop_profile()
@@ -166,12 +162,12 @@ def main_worker(rank, opts):
                 macs = prof.get_total_macs()
                 params = prof.get_total_params()
                 if print_profile:
-                    file_path = os.path.join("./profile",f"gpu{str(local_gpu_id)}",f"iter{i}_epoch{epoch}.txt")
+                    file_path = os.path.join("./profile",f"gpu{str(local_gpu_id)}",f"epoch{epoch}_iter{i}.txt")
                     prof.print_model_profile(profile_step=profile_step, output_file=file_path)
 
                     with open(file_path, 'a') as f:
                         current_time = time.time()
-                        f.write(str(current_time - start_time))
+                        f.write(f'timestamp:{str(current_time - start_time)}')
 
                 prof.end_profile()
 
@@ -200,14 +196,6 @@ def main_worker(rank, opts):
                                                                                                           lr,
                                                                                                           toc - tic))
 
-                # vis.line(X=torch.ones((1, 1)) * i + epoch * len(train_loader),
-                #          Y=torch.Tensor([loss]).unsqueeze(0),
-                #          update='append',
-                #          win='loss',
-                #          opts=dict(x_label='step',
-                #                    y_label='loss',
-                #                    title='loss',
-                #                    legend=['total_loss']))
 
         # save pth file
         if opts.rank == 0:

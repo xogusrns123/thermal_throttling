@@ -1,1 +1,3 @@
-torchrun --nproc_per_node=2 main.py --epoch=20
+#! /bin/bash
+
+docker run -t --rm --name thermal_throttling --gpus all -v ./:/app pytorch_ddp
