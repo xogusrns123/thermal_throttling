@@ -71,6 +71,12 @@ def main_worker(rank, opts):
                                                 std=(0.2023, 0.1994, 0.2010)),
                                         ])
 
+    # First process downloads the dataset, the others wait for completion
+    if opts.rank == 0:
+        CIFAR10(root=opts.root, train=True, download=True)
+        CIFAR10(root=opts.root, train=False, download=True)
+    dist.barrier()  # All processes synchronize here
+
     train_set = CIFAR10(root=opts.root,
                         train=True,
                         transform=transform_train,
