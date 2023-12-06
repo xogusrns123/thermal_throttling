@@ -137,11 +137,15 @@ def main_worker(rank, opts):
         if opts.rank == 0:
             print('\nLoaded checkpoint from epoch %d.\n' % (int(opts.start_epoch) - 1))
 
-    
-    profile_step = 5
-    print_profile = True
 
-    start_time = time.time() 
+    profile_step = 5
+    file_path = os.path.join("./profile", f"gpu{str(local_gpu_id)}.csv")
+    with open(file_path, mode='w') as f:
+        writer = csv.writer(f)
+
+        # CSV 헤더 작성
+        writer.writerow(['epoch', 'iter', 'flops', 'latency'])
+
     for epoch in range(opts.start_epoch, opts.epoch):
 
         # 9. train
@@ -151,12 +155,12 @@ def main_worker(rank, opts):
 
         for i, (images, labels) in enumerate(train_loader):
 
+            images = images.to(local_gpu_id)
+            labels = labels.to(local_gpu_id)
+
             # start profiling at training step "profile_step"
             if i % profile_step == 0:
                 prof.start_profile()
-
-            images = images.to(local_gpu_id)
-            labels = labels.to(local_gpu_id)
 
             # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], profile_memory= True, with_flops= True) as prof:    
             outputs = model(images)
@@ -164,16 +168,18 @@ def main_worker(rank, opts):
             # end profiling and print ouput
             if i % profile_step == 0:  
                 prof.stop_profile()
-                flops = prof.get_total_flops()
-                macs = prof.get_total_macs()
-                params = prof.get_total_params()
-                if print_profile:
-                    file_path = os.path.join("./profile",f"gpu{str(local_gpu_id)}",f"epoch{epoch}_iter{i}.txt")
-                    prof.print_model_profile(profile_step=profile_step, output_file=file_path)
+                flops = prof.get_total_flops(as_string=True).strip()
+                latency = prof.get_total_duration(as_string=True).strip()
 
-                    with open(file_path, 'a') as f:
-                        current_time = time.time()
-                        f.write(f'timestamp:{str(current_time - start_time)}')
+                # gpu_stats = os.popen(f"nvidia-smi --query-gpu=timestamp,temperature.gpu,utilization.gpu,power.draw,power.limit,memory.used,memory.total \
+                #                          --id={idx} --format=csv,noheader").read().split(',')
+                                         #['2023/12/06 06:23:51.751', ' 32', ' 0 %', ' 34 %', ' 22.22 W', ' 450.00 W', ' 1 MiB', ' 24564 MiB\n']
+                # prof.print_model_profile(profile_step=profile_step, output_file=file_path)
+
+                with open(file_path, 'a') as f:
+                    writer = csv.writer(f)
+
+                    writer.writerow([str(epoch), str(i), flops, latency])
 
                 prof.end_profile()
 
