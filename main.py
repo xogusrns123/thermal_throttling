@@ -5,6 +5,7 @@ This is application for single node multi-gpus
 import os
 import time
 import torch
+import csv
 # import visdom
 import argparse
 import torch.distributed as dist
@@ -34,9 +35,9 @@ def get_args_parser():
     parser.add_argument('--vis_step', type=int, default=10)
     parser.add_argument('--num_workers', type=int, default=16) # 
     # parser.add_argument('--gpu_ids', nargs="+", default=['0'])
-    parser.add_argument('--gpu_ids', nargs="+", default=['0', '1'])
+    # parser.add_argument('--gpu_ids', nargs="+", default=['0', '1'])
     # parser.add_argument('--gpu_ids', nargs="+", default=['0', '1', '2'])
-    # parser.add_argument('--gpu_ids', nargs="+", default=['0', '1', '2', '3'])
+    parser.add_argument('--gpu_ids', nargs="+", default=['0', '1', '2', '3'])
     parser.add_argument('--world_size', type=int, default=0) # total number of process in your cluster
     parser.add_argument('--port', type=int, default=8097)
     parser.add_argument('--root', type=str, default='./cifar')
@@ -72,10 +73,10 @@ def main_worker(rank, opts):
                                         ])
 
     # First process downloads the dataset, the others wait for completion
-    if opts.rank == 0:
-        CIFAR10(root=opts.root, train=True, download=True)
-        CIFAR10(root=opts.root, train=False, download=True)
-    dist.barrier()  # All processes synchronize here
+    # if opts.rank == 0:
+    #     CIFAR10(root=opts.root, train=True, download=True)
+    #     CIFAR10(root=opts.root, train=False, download=True)
+    # dist.barrier()  # All processes synchronize here
 
     train_set = CIFAR10(root=opts.root,
                         train=True,
@@ -140,6 +141,13 @@ def main_worker(rank, opts):
 
     profile_step = 5
     file_path = os.path.join("./profile", f"gpu{str(local_gpu_id)}.csv")
+
+    # CSV 파일의 디렉토리 경로를 추출합니다.
+    dir_name = os.path.dirname(file_path)
+
+    # 디렉토리가 존재하지 않는 경우 디렉토리를 생성합니다.
+    os.makedirs(dir_name, exist_ok=True)
+
     with open(file_path, mode='w') as f:
         writer = csv.writer(f)
 

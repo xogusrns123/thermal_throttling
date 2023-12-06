@@ -23,9 +23,11 @@ COPY . /app
 # requirements.txt install
 RUN pip install -r requirements.txt
 
+
 # Set environment variables for distributed training
 # ENV NCCL_SOCKET_IFNAME=eth0
+RUN chmod +x app_run.sh
 
 # Define the command to run your distributed training script
 # Adjust the script name and parameters accordingly
-CMD ["torchrun", "--nproc_per_node=2", "main.py", "--epoch=20"]
+CMD ["./app_run.sh"]
