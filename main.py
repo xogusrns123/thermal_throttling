@@ -35,9 +35,9 @@ def get_args_parser():
     parser.add_argument('--vis_step', type=int, default=10)
     parser.add_argument('--num_workers', type=int, default=16) # 
     # parser.add_argument('--gpu_ids', nargs="+", default=['0'])
-    # parser.add_argument('--gpu_ids', nargs="+", default=['0', '1'])
+    parser.add_argument('--gpu_ids', nargs="+", default=['0', '1'])
     # parser.add_argument('--gpu_ids', nargs="+", default=['0', '1', '2'])
-    parser.add_argument('--gpu_ids', nargs="+", default=['0', '1', '2', '3'])
+    #parser.add_argument('--gpu_ids', nargs="+", default=['0', '1', '2', '3'])
     parser.add_argument('--world_size', type=int, default=0) # total number of process in your cluster
     parser.add_argument('--port', type=int, default=8097)
     parser.add_argument('--root', type=str, default='./cifar')
