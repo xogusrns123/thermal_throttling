@@ -35,9 +35,9 @@ def get_args_parser():
     parser.add_argument('--vis_step', type=int, default=10)
     parser.add_argument('--num_workers', type=int, default=16) # 
     # parser.add_argument('--gpu_ids', nargs="+", default=['0'])
-    parser.add_argument('--gpu_ids', nargs="+", default=['0', '1'])
+    # parser.add_argument('--gpu_ids', nargs="+", default=['0', '1'])
     # parser.add_argument('--gpu_ids', nargs="+", default=['0', '1', '2'])
-    #parser.add_argument('--gpu_ids', nargs="+", default=['0', '1', '2', '3'])
+    parser.add_argument('--gpu_ids', nargs="+", default=['0', '1', '2', '3'])
     parser.add_argument('--world_size', type=int, default=0) # total number of process in your cluster
     parser.add_argument('--port', type=int, default=8097)
     parser.add_argument('--root', type=str, default='./cifar')
@@ -217,68 +217,59 @@ def main_worker(rank, opts):
                                                                                                           toc - tic))
 
 
-        # save pth file
-        if opts.rank == 0:
-            if not os.path.exists(opts.save_path):
-                os.mkdir(opts.save_path)
+        # # save pth file
+        # if opts.rank == 0:
+        #     if not os.path.exists(opts.save_path):
+        #         os.mkdir(opts.save_path)
 
-            checkpoint = {'epoch': epoch,
-                          'model_state_dict': model.state_dict(),
-                          'optimizer_state_dict': optimizer.state_dict(),
-                          'scheduler_state_dict': scheduler.state_dict()}
+        #     checkpoint = {'epoch': epoch,
+        #                   'model_state_dict': model.state_dict(),
+        #                   'optimizer_state_dict': optimizer.state_dict(),
+        #                   'scheduler_state_dict': scheduler.state_dict()}
 
-            torch.save(checkpoint, os.path.join(opts.save_path, opts.save_file_name + '.{}.pth.tar'.format(epoch)))
-            print("save pth.tar {} epoch!".format(epoch))
+        #     torch.save(checkpoint, os.path.join(opts.save_path, opts.save_file_name + '.{}.pth.tar'.format(epoch)))
+        #     print("save pth.tar {} epoch!".format(epoch))
 
-        # 10. test
-        if opts.rank == 0:
-            model.eval()
+        # # 10. test
+        # if opts.rank == 0:
+        #     model.eval()
 
-            val_avg_loss = 0
-            correct_top1 = 0
-            correct_top5 = 0
-            total = 0
+        #     val_avg_loss = 0
+        #     correct_top1 = 0
+        #     correct_top5 = 0
+        #     total = 0
 
-            with torch.no_grad():
-                for i, (images, labels) in enumerate(test_loader):
-                    images = images.to(opts.rank)  # [100, 3, 224, 224]
-                    labels = labels.to(opts.rank)  # [100]
-                    outputs = model(images)
-                    loss = criterion(outputs, labels)
-                    val_avg_loss += loss.item()
-                    # ------------------------------------------------------------------------------
-                    # rank 1
-                    _, pred = torch.max(outputs, 1)
-                    total += labels.size(0)
-                    correct_top1 += (pred == labels).sum().item()
+        #     with torch.no_grad():
+        #         for i, (images, labels) in enumerate(test_loader):
+        #             images = images.to(opts.rank)  # [100, 3, 224, 224]
+        #             labels = labels.to(opts.rank)  # [100]
+        #             outputs = model(images)
+        #             loss = criterion(outputs, labels)
+        #             val_avg_loss += loss.item()
+        #             # ------------------------------------------------------------------------------
+        #             # rank 1
+        #             _, pred = torch.max(outputs, 1)
+        #             total += labels.size(0)
+        #             correct_top1 += (pred == labels).sum().item()
 
-                    # ------------------------------------------------------------------------------
-                    # rank 5
-                    _, rank5 = outputs.topk(5, 1, True, True)
-                    rank5 = rank5.t()
-                    correct5 = rank5.eq(labels.view(1, -1).expand_as(rank5))
+        #             # ------------------------------------------------------------------------------
+        #             # rank 5
+        #             _, rank5 = outputs.topk(5, 1, True, True)
+        #             rank5 = rank5.t()
+        #             correct5 = rank5.eq(labels.view(1, -1).expand_as(rank5))
 
-                    # ------------------------------------------------------------------------------
-                    for k in range(5):  # 0, 1, 2, 3, 4, 5
-                        correct_k = correct5[:k+1].reshape(-1).float().sum(0, keepdim=True)
-                    correct_top5 += correct_k.item()
+        #             # ------------------------------------------------------------------------------
+        #             for k in range(5):  # 0, 1, 2, 3, 4, 5
+        #                 correct_k = correct5[:k+1].reshape(-1).float().sum(0, keepdim=True)
+        #             correct_top5 += correct_k.item()
 
-            accuracy_top1 = correct_top1 / total
-            accuracy_top5 = correct_top5 / total
+        #     accuracy_top1 = correct_top1 / total
+        #     accuracy_top5 = correct_top5 / total
 
-            val_avg_loss = val_avg_loss / len(test_loader)  # make mean loss
-            # if vis is not None:
-            #     vis.line(X=torch.ones((1, 3)) * epoch,
-            #              Y=torch.Tensor([accuracy_top1, accuracy_top5, val_avg_loss]).unsqueeze(0),
-            #              update='append',
-            #              win='test_loss_acc',
-            #              opts=dict(x_label='epoch',
-            #                        y_label='test_loss and acc',
-            #                        title='test_loss and accuracy',
-            #                        legend=['accuracy_top1', 'accuracy_top5', 'avg_loss']))
+        #     val_avg_loss = val_avg_loss / len(test_loader)  # make mean loss
 
-            print("top-1 percentage :  {0:0.3f}%".format(correct_top1 / total * 100))
-            print("top-5 percentage :  {0:0.3f}%".format(correct_top5 / total * 100))
+            # print("top-1 percentage :  {0:0.3f}%".format(correct_top1 / total * 100))
+            # print("top-5 percentage :  {0:0.3f}%".format(correct_top5 / total * 100))
             scheduler.step()
 
     cleanup()
@@ -290,10 +281,13 @@ def init_for_distributed(rank, opts):
 
     # 1. setting for distributed training
     opts.rank = rank
-    print(f'rank:{opts.rank}')
     local_gpu_id = int(opts.gpu_ids[opts.rank])
-    print(f'local_gpu_id:{local_gpu_id}')
-    print(f'device:{torch.cuda.device_count()}')
+
+    if opts.rank == 0:
+        print(f'rank:{opts.rank}')
+        print(f'local_gpu_id:{local_gpu_id}')
+        print(f'device:{torch.cuda.device_count()}')
+
     torch.cuda.set_device(local_gpu_id)
     if opts.rank is not None:
         print("Use GPU: {} for training".format(local_gpu_id))
@@ -308,7 +302,7 @@ def init_for_distributed(rank, opts):
     torch.distributed.barrier()
     # convert print fn iif rank is zero
     # setup_for_distributed(opts.rank == 0)
-    print(opts)
+
     return local_gpu_id
 
 
@@ -337,8 +331,6 @@ if __name__ == '__main__':
 
     opts.world_size = len(opts.gpu_ids)
     opts.num_workers = len(opts.gpu_ids) * 4
-
-    print(opts.world_size)
 
     # main_worker(opts.rank, opts)
     mp.spawn(main_worker,
