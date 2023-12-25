@@ -1,4 +1,6 @@
 ./*
 !requirements.txt
 !main.py
-!app_run.sh
+!run.sh
+!train.py
+!gpu_monitor.py

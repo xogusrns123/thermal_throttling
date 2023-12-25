@@ -1,0 +1,1 @@
+sudo docker run --name my_nvidia_monitor -d --rm --gpus all -it -v ./data:/app/data nvidia_monitor
