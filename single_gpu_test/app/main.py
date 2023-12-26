@@ -59,17 +59,22 @@ if __name__ == '__main__':
     pcs1 = multiprocessing.Process(target=launch, args=(info_file_path, opts.gpu,))
     pcs2 = multiprocessing.Process(target=train, args=(opts, latency_file_path,))
 
+    print("start process 1 gpu_monitoring")
     pcs1.start()
 
     time.sleep(1)
 
+    print("start process 2 training")
     pcs2.start()
 
     # wait until pcs2 terminated
+    print("wait until process 2 terminated")
     pcs2.join()
 
     # if pcs terminated, terminate pcs1
-    pcs1.terminate()
-    pcs1.join()
+    if pcs1.is_alive():
+        print("Terminating process 1...")
+        pcs1.terminate()
+        pcs1.join()
 
     print("All process terminated")

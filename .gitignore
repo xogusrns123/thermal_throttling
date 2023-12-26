@@ -2,5 +2,5 @@ cifar/
 save/
 profile/
 .ipynb_checkpoints
-app/__pycache__/
-app/data/
+single_gpu_test/app/__pycache__/
+single_gpu_test/data/
