@@ -9,7 +9,7 @@ import multiprocessing
 from train import train
 from gpu_monitor import launch
 import time
-
+from plot import draw
 
 def get_args_parser():
     parser = argparse.ArgumentParser(add_help=False)
@@ -78,3 +78,6 @@ if __name__ == '__main__':
         pcs1.join()
 
     print("All process terminated")
+    print("run plot.py")
+    datadirectory = f'/app/data/{opts.gpu_label}'
+    draw(datadirectory)

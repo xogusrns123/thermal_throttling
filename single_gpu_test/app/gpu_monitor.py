@@ -3,6 +3,7 @@ import csv
 from datetime import datetime
 import time
 import traceback
+import sys
 
 
 
@@ -24,7 +25,7 @@ def launch(file_path, idx):
     except Exception as e:
         print("An error occurred in the gpu_monitor.py")
         print(traceback.format_exc())
-        raise e
+        sys.exit(1)
 
 
 

@@ -3,7 +3,7 @@ from datetime import datetime
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-DataDirectory = '/home/jovyan/jupyter/thermal_throttling/single_gpu_test/data/1080Ti-0'
+
 def get_file_path(dir_path):
     file_list = os.listdir(dir_path)
 
@@ -16,8 +16,8 @@ def get_file_path(dir_path):
 
     return info_file_path, latency_file_path
 
-if __name__ == '__main__':
-    info_file_path, latency_file_path = get_file_path(DataDirectory)
+def draw(datadirectory):
+    info_file_path, latency_file_path = get_file_path(datadirectory)
 
     df = pd.read_csv(info_file_path)
 
@@ -105,7 +105,7 @@ if __name__ == '__main__':
         plt.setp(ax.get_xticklabels(), rotation=45)
         
     fig.tight_layout()
-    plt.savefig(os.path.join(DataDirectory, 'gpu_info.png'))
+    plt.savefig(os.path.join(datadirectory, 'gpu_info.png'))
 
     df = pd.read_csv(latency_file_path)
     iter = df['iter']
@@ -127,4 +127,4 @@ if __name__ == '__main__':
         ax.set_xlabel('iter')
         ax.set_ylabel('1/total_latency')
     
-    plt.savefig(os.path.join(DataDirectory, 'latency.png'))
+    plt.savefig(os.path.join(datadirectory, 'latency.png'))

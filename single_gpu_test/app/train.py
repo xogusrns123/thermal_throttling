@@ -5,12 +5,12 @@ from torchvision.models import resnet152
 import os
 import csv
 import traceback
-
+import sys
 
 def train(opts, file_path):
     try:
         device = torch.device(f"cuda:{str(opts.gpu)}" if torch.cuda.is_available() else "cpu")
-
+        print("find gpu device")
         # ResNet 모델 로드
         model = resnet152()
         model = model.to(device)
@@ -24,6 +24,7 @@ def train(opts, file_path):
         
         model.train()
 
+        print("start record event")
         # puts a time stamp in the stream of gpu kernel execution
         before_forward_event = torch.cuda.Event(enable_timing=True)
         after_forward_event = torch.cuda.Event(enable_timing=True)
@@ -67,4 +68,4 @@ def train(opts, file_path):
     except Exception as e:
         print("An eror occured in the train.py")
         print(traceback.format_exc())
-        raise e
+        sys.exit(1)

@@ -21,7 +21,7 @@ WORKDIR /app
 COPY . /app
 
 # requirements.txt install
-# RUN pip install -r requirements.txt
+RUN pip install -r requirements.txt
 
 
 # Set environment variables for distributed training
