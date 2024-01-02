@@ -53,7 +53,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser('resnet152 training', parents=[get_args_parser()])
     opts = parser.parse_args()
-
+    print(opts)
     latency_file_path, info_file_path = get_filepath(opts.gpu, opts.gpu_label)
 
     pcs1 = multiprocessing.Process(target=launch, args=(info_file_path, opts.gpu,))

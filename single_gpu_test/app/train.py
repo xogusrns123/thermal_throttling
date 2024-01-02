@@ -9,12 +9,15 @@ import sys
 
 def train(opts, file_path):
     try:
-        device = torch.device(f"cuda:{str(opts.gpu)}" if torch.cuda.is_available() else "cpu")
-        print("find gpu device")
+        os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+        os.environ["CUDA_VISIBLE_DEVICES"] = f"{str(opts.gpu)}"
+        device = torch.device(f"cuda:0" if torch.cuda.is_available() else "cpu")
+        if device.type != "cuda":
+            raise Exception("Can't not use GPU")
+        print('Current Device:', torch.cuda.current_device())
         # ResNet 모델 로드
         model = resnet152()
         model = model.to(device)
-
         # 손실함수 및 최적화기 정의
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
